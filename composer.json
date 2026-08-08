@@ -1,0 +1,19 @@
+{
+    "name": "switch/view",
+    "description": "Switch Framework View Subsystem with HTML-Tag Syntax Template Compiler",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Switch\\View\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Switch\\View\\Tests\\": "tests/"
+        }
+    }
+}
