@@ -25,6 +25,11 @@ class ViewEngine
 
     private ?string $layout = null;
 
+    /**
+     * @var array<string, mixed> Shared global data across all views
+     */
+    private array $sharedData = [];
+
     public function __construct(string $viewsPath, ?string $cachePath = null, ?TemplateCompiler $compiler = null)
     {
         $this->viewsPath = rtrim($viewsPath, '/\\');
@@ -36,8 +41,33 @@ class ViewEngine
         }
     }
 
+    /**
+     * Share global data with all rendered views.
+     */
+    public function share(string|array $key, mixed $value = null): self
+    {
+        if (is_array($key)) {
+            $this->sharedData = array_merge($this->sharedData, $key);
+        } else {
+            $this->sharedData[$key] = $value;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Register a custom component renderer.
+     */
+    public function component(string $name, callable|string $handler): self
+    {
+        \Switch\View\Component\ComponentRegistry::register($name, $handler);
+        return $this;
+    }
+
     public function render(string $view, array $data = []): string
     {
+        $mergedData = array_merge($this->sharedData, $data);
+
         $viewPath = $this->resolveViewPath($view);
         $compiledPath = $this->getCompiledPath($viewPath);
 
@@ -50,12 +80,12 @@ class ViewEngine
             file_put_contents($compiledPath, $compiled);
         }
 
-        $result = $this->evaluate($compiledPath, $data);
+        $result = $this->evaluate($compiledPath, $mergedData);
 
         if ($this->layout !== null) {
             $layoutView = $this->layout;
             $this->layout = null;
-            return $this->render($layoutView, $data);
+            return $this->render($layoutView, $mergedData);
         }
 
         return $result;
