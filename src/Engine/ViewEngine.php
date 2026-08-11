@@ -163,17 +163,16 @@ class ViewEngine
     private function resolveViewPath(string $view): string
     {
         $normalized = str_replace('.', '/', $view);
-        $file = $this->viewsPath . '/' . $normalized . '.php';
-
-        if (!file_exists($file)) {
-            $fileHtml = $this->viewsPath . '/' . $normalized . '.html';
-            if (file_exists($fileHtml)) {
-                return $fileHtml;
+        
+        $extensions = ['.switch.php', '.php', '.html'];
+        foreach ($extensions as $ext) {
+            $file = $this->viewsPath . '/' . $normalized . $ext;
+            if (file_exists($file)) {
+                return $file;
             }
-            throw new ViewNotFoundException("View '{$view}' not found at path '{$file}'");
         }
 
-        return $file;
+        throw new ViewNotFoundException("View '{$view}' not found in path '{$this->viewsPath}'");
     }
 
     private function getCompiledPath(string $viewPath): string
