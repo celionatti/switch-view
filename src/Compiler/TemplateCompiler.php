@@ -16,10 +16,11 @@ class TemplateCompiler
         // 2. Custom Raw PHP blocks <php>...</php>
         $contents = preg_replace('/<php>(.*?)<\/php>/s', '<?php $1 ?>', $contents) ?? $contents;
 
-        // 3. Security Shortcut Directives: @csrf, @honeypot, @nonce
+        // 3. Security & Framework Directives: @csrf, @honeypot, @nonce, @liveScripts
         $contents = preg_replace('/@csrf\b/i', '<?= \Switch\View\Security\SecurityHelper::csrfField(); ?>', $contents) ?? $contents;
         $contents = preg_replace('/@honeypot\b/i', '<?= \Switch\View\Security\SecurityHelper::honeypot(); ?>', $contents) ?? $contents;
         $contents = preg_replace('/@nonce\b/i', 'nonce="<?= \Switch\View\Security\SecurityHelper::getCspNonce(); ?>"', $contents) ?? $contents;
+        $contents = preg_replace('/@liveScripts\b/i', '<?= function_exists(\'live_scripts\') ? live_scripts() : \'\'; ?>', $contents) ?? $contents;
 
         // 4. Raw Interpolation {!! $expr !!}
         $contents = preg_replace_callback('/\{\!\!\s*(.*?)\s*\!\!\}/s', function ($m) {
