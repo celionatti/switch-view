@@ -52,6 +52,12 @@ class ViewEngine
         if (!is_dir($this->cachePath)) {
             @mkdir($this->cachePath, 0777, true);
         }
+
+        $this->sharedData = [
+            'version' => '1.0.0',
+            'framework' => 'Switch',
+            'phpVersion' => PHP_VERSION,
+        ];
     }
 
     /**
@@ -110,12 +116,16 @@ class ViewEngine
             file_put_contents($compiledPath, $compiled);
         }
 
+        $previousLayout = $this->layout;
+        $this->layout = null;
+
         $result = $this->evaluate($compiledPath, $mergedData);
 
-        if ($this->layout !== null) {
-            $layoutView = $this->layout;
-            $this->layout = null;
-            return $this->render($layoutView, $mergedData);
+        $currentLayout = $this->layout;
+        $this->layout = $previousLayout;
+
+        if ($currentLayout !== null) {
+            return $this->render($currentLayout, $mergedData);
         }
 
         return $result;
