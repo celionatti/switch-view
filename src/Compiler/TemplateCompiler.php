@@ -45,7 +45,7 @@ class TemplateCompiler
         }, $contents) ?? $contents;
 
         // 8. Layout Extension: <layout name="layouts.app" /> or <extends name="layouts.app" />
-        $contents = preg_replace_callback('/<(?:layout|extends)\s+name=[\'"]([^\'"]+)[\'"]\s*\/?>/i', function ($m) {
+        $contents = preg_replace_callback('/<(?:layout|extends)\s+(?:name|layout|file)=[\'"]([^\'"]+)[\'"]\s*\/?>/i', function ($m) {
             return '<?php $this->extend(\'' . $m[1] . '\'); ?>';
         }, $contents) ?? $contents;
 
