@@ -107,4 +107,13 @@ class CompilerTest extends TestCase
 
         $this->assertStringContainsString('($user)', $compiled);
     }
+
+    public function testCompileFlashDirectives(): void
+    {
+        $template = '<flash mode="toast" position="bottom-right" />@flash';
+        $compiled = $this->compiler->compile($template);
+
+        $this->assertStringContainsString("flash_render('toast'", $compiled);
+        $this->assertStringContainsString("flash_render()", $compiled);
+    }
 }

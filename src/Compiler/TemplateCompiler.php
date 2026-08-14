@@ -16,11 +16,17 @@ class TemplateCompiler
         // 2. Custom Raw PHP blocks <php>...</php>
         $contents = preg_replace('/<php>(.*?)<\/php>/s', '<?php $1 ?>', $contents) ?? $contents;
 
-        // 3. Security & Framework Directives: @csrf, @honeypot, @nonce, @liveScripts
+        // 3. Security & Framework Directives: @csrf, @honeypot, @nonce, @liveScripts, @flash
         $contents = preg_replace('/@csrf\b/i', '<?= \Switch\View\Security\SecurityHelper::csrfField(); ?>', $contents) ?? $contents;
         $contents = preg_replace('/@honeypot\b/i', '<?= \Switch\View\Security\SecurityHelper::honeypot(); ?>', $contents) ?? $contents;
         $contents = preg_replace('/@nonce\b/i', 'nonce="<?= \Switch\View\Security\SecurityHelper::getCspNonce(); ?>"', $contents) ?? $contents;
         $contents = preg_replace('/@liveScripts\b/i', '<?= function_exists(\'live_scripts\') ? live_scripts() : \'\'; ?>', $contents) ?? $contents;
+        $contents = preg_replace('/@flash\b/i', '<?= function_exists(\'flash_render\') ? flash_render() : \'\'; ?>', $contents) ?? $contents;
+        $contents = preg_replace_callback('/<flash(?:\s+mode=[\'"]([^\'"]+)[\'"])?(?:\s+position=[\'"]([^\'"]+)[\'"])?\s*\/?>/i', function ($m) {
+            $mode = !empty($m[1]) ? '\'' . $m[1] . '\'' : '\'toast\'';
+            $pos = !empty($m[2]) ? '\'' . $m[2] . '\'' : '\'bottom-right\'';
+            return '<?= function_exists(\'flash_render\') ? flash_render(' . $mode . ', [\'position\' => ' . $pos . ']) : \'\'; ?>';
+        }, $contents) ?? $contents;
 
         // 4. Raw Interpolation {!! $expr !!}
         $contents = preg_replace_callback('/\{\!\!\s*(.*?)\s*\!\!\}/s', function ($m) {
