@@ -12,6 +12,19 @@ class ViewEngine
     private TemplateCompiler $compiler;
     private string $viewsPath;
     private string $cachePath;
+    private bool $debug = true;
+
+    /**
+     * In-memory cache for resolved view file paths.
+     * @var array<string, string>
+     */
+    private array $resolvedPaths = [];
+
+    /**
+     * In-memory cache for compiled file paths.
+     * @var array<string, string>
+     */
+    private array $compiledPaths = [];
 
     /**
      * @var array<string, string> Section name => content
@@ -37,8 +50,17 @@ class ViewEngine
         $this->compiler = $compiler ?? new TemplateCompiler();
 
         if (!is_dir($this->cachePath)) {
-            mkdir($this->cachePath, 0777, true);
+            @mkdir($this->cachePath, 0777, true);
         }
+    }
+
+    /**
+     * Enable or disable debug mode (In production, set to false to bypass filemtime disk stat calls).
+     */
+    public function setDebug(bool $debug): self
+    {
+        $this->debug = $debug;
+        return $this;
     }
 
     /**
@@ -66,12 +88,20 @@ class ViewEngine
 
     public function render(string $view, array $data = []): string
     {
-        $mergedData = array_merge($this->sharedData, $data);
+        $mergedData = empty($this->sharedData) ? $data : array_merge($this->sharedData, $data);
 
         $viewPath = $this->resolveViewPath($view);
         $compiledPath = $this->getCompiledPath($viewPath);
 
-        if (!file_exists($compiledPath) || filemtime($viewPath) > filemtime($compiledPath)) {
+        // Fast-path for production: skip filemtime stat calls if compiled file exists
+        $needsCompilation = false;
+        if (!file_exists($compiledPath)) {
+            $needsCompilation = true;
+        } elseif ($this->debug && filemtime($viewPath) > filemtime($compiledPath)) {
+            $needsCompilation = true;
+        }
+
+        if ($needsCompilation) {
             $contents = file_get_contents($viewPath);
             if ($contents === false) {
                 throw new ViewNotFoundException("Unable to read view file '{$viewPath}'");
@@ -118,38 +148,36 @@ class ViewEngine
     }
 
     /**
-     * Universal property accessor supporting arrays, ArrayAccess, and objects.
-     *
-     * Used by compiled dot-syntax expressions (e.g. $user.name compiles to $this->get($user, 'name')).
-     * Works with:
-     *   - Arrays: $user['name']
-     *   - Objects: $user->name
-     *   - ArrayAccess: $user['name'] via offsetGet
+     * Ultra-fast universal property accessor supporting arrays, ArrayAccess, and objects.
      */
     public function get(mixed $target, string $key, mixed $default = null): mixed
     {
         if (is_array($target)) {
-            return array_key_exists($key, $target) ? $target[$key] : $default;
+            return $target[$key] ?? (array_key_exists($key, $target) ? null : $default);
         }
 
         if (is_object($target)) {
-            // ArrayAccess objects: try offset first
-            if ($target instanceof \ArrayAccess && $target->offsetExists($key)) {
-                return $target->offsetGet($key);
-            }
-
-            // Public property
+            // Direct property access
             if (isset($target->{$key})) {
                 return $target->{$key};
             }
 
-            // Getter method: getName()
-            $getter = 'get' . ucfirst($key);
+            // ArrayAccess offset
+            if ($target instanceof \ArrayAccess && $target->offsetExists($key)) {
+                return $target->offsetGet($key);
+            }
+
+            // Getter method: getname() or getName()
+            $getter = 'get' . $key;
             if (method_exists($target, $getter)) {
                 return $target->{$getter}();
             }
 
-            // isset returns false for null values; check property_exists too
+            $getterUc = 'get' . ucfirst($key);
+            if (method_exists($target, $getterUc)) {
+                return $target->{$getterUc}();
+            }
+
             if (property_exists($target, $key)) {
                 return $target->{$key};
             }
@@ -160,26 +188,39 @@ class ViewEngine
         return $default;
     }
 
+    /**
+     * Resolve template file path with in-memory caching.
+     */
     private function resolveViewPath(string $view): string
     {
+        if (isset($this->resolvedPaths[$view])) {
+            return $this->resolvedPaths[$view];
+        }
+
         $normalized = str_replace('.', '/', $view);
-        
         $extensions = ['.switch.php', '.php', '.html'];
+
         foreach ($extensions as $ext) {
             $file = $this->viewsPath . '/' . $normalized . $ext;
             if (file_exists($file)) {
-                return $file;
+                return $this->resolvedPaths[$view] = $file;
             }
         }
 
         throw new ViewNotFoundException("View '{$view}' not found in path '{$this->viewsPath}'");
     }
 
+    /**
+     * Get compiled cache path with in-memory caching.
+     */
     private function getCompiledPath(string $viewPath): string
     {
-        return $this->cachePath . '/' . md5($viewPath) . '.php';
+        return $this->compiledPaths[$viewPath] ??= $this->cachePath . '/' . md5($viewPath) . '.php';
     }
 
+    /**
+     * Execute compiled view template with extracted scope.
+     */
     private function evaluate(string $__compiledPath, array $__data): string
     {
         extract($__data, EXTR_SKIP);
