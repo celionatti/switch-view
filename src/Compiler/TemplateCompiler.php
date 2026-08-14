@@ -40,7 +40,7 @@ class TemplateCompiler
         // 7. Partials: <partial name="partials.header" ... /> and <include file="partials.header" ... />
         $contents = preg_replace_callback('/<(?:include|partial)\s+(?:file|name)=[\'"]([^\'"]+)[\'"](?:\s+(?:data|with)=[\'"]([^\'"]*)[\'"])?\s*\/?>/i', function ($m) {
             $file = $m[1];
-            $data = !empty($m[2]) ? $this->compileDotSyntax($m[2]) : '[]';
+            $data = !empty($m[2]) ? 'array_merge($__data, ' . $this->compileDotSyntax($m[2]) . ')' : '$__data';
             return '<?= $this->render(\'' . $file . '\', ' . $data . '); ?>';
         }, $contents) ?? $contents;
 
